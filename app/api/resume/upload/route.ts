@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { getCollection, COLLECTIONS } from "@/services/mongodb"
 import { parseFile, calculateFileHash, validateFile } from "@/services/file-parser"
 import { parseResumeWithGemini, type ParsedResumeData } from "@/services/gemini"
 import { ObjectId } from "mongodb"
 
 export const maxDuration = 60 // Allow up to 60 seconds for processing
+
+// Demo mode: Use a constant user ID instead of session auth
+const DEMO_USER_ID = "demo-user"
 
 interface ResumeDocument {
   _id?: ObjectId
@@ -23,16 +25,8 @@ interface ResumeDocument {
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized. Please sign in to upload a resume." },
-        { status: 401 }
-      )
-    }
-
-    const userId = session.user.id
+    // Demo mode: bypass authentication
+    const userId = DEMO_USER_ID
 
     // Parse form data
     const formData = await request.formData()

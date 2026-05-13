@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut, useSession } from "next-auth/react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import {
@@ -13,8 +12,14 @@ import {
   Settings,
   TrendingUp,
   FileText,
-  LogOut,
 } from "lucide-react";
+
+// Demo mode: static demo user info
+const DEMO_USER = {
+  name: "Demo User",
+  email: "demo@jobslensai.com",
+  image: null,
+};
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -27,7 +32,6 @@ const navItems = [
 
 export function DashboardSidebar() {
   const pathname = usePathname();
-  const { data: session } = useSession();
 
   const getInitials = (name: string | null | undefined) => {
     if (!name) return "U";
@@ -53,21 +57,19 @@ export function DashboardSidebar() {
         </Link>
       </div>
 
-      {/* User Info */}
-      {session?.user && (
-        <div className="p-4 border-b border-border">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-10 w-10">
-              <AvatarImage src={session.user.image || undefined} />
-              <AvatarFallback>{getInitials(session.user.name)}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{session.user.name}</p>
-              <p className="text-xs text-muted-foreground truncate">{session.user.email}</p>
-            </div>
+      {/* User Info - Demo Mode */}
+      <div className="p-4 border-b border-border">
+        <div className="flex items-center gap-3">
+          <Avatar className="h-10 w-10">
+            <AvatarImage src={DEMO_USER.image || undefined} />
+            <AvatarFallback>{getInitials(DEMO_USER.name)}</AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{DEMO_USER.name}</p>
+            <p className="text-xs text-muted-foreground truncate">{DEMO_USER.email}</p>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1">

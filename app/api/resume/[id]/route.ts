@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { getCollection, COLLECTIONS } from "@/services/mongodb"
 import { ObjectId } from "mongodb"
 import type { ParsedResumeData } from "@/services/gemini"
+
+// Demo mode: Use a constant user ID instead of session auth
+const DEMO_USER_ID = "demo-user"
 
 interface ResumeDocument {
   _id?: ObjectId
@@ -24,14 +26,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-
+    // Demo mode: bypass authentication
     const { id } = await params
 
     if (!ObjectId.isValid(id)) {
@@ -41,7 +36,7 @@ export async function GET(
       )
     }
 
-    const userId = session.user.id
+    const userId = DEMO_USER_ID
     const resumesCollection = await getCollection<ResumeDocument>(COLLECTIONS.RESUMES)
 
     const resume = await resumesCollection.findOne({
@@ -85,14 +80,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-
+    // Demo mode: bypass authentication
     const { id } = await params
 
     if (!ObjectId.isValid(id)) {
@@ -102,7 +90,7 @@ export async function DELETE(
       )
     }
 
-    const userId = session.user.id
+    const userId = DEMO_USER_ID
     const resumesCollection = await getCollection<ResumeDocument>(COLLECTIONS.RESUMES)
 
     const result = await resumesCollection.deleteOne({

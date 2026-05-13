@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { getCollection, COLLECTIONS } from "@/services/mongodb"
 import { ObjectId } from "mongodb"
 import type { ParsedResumeData } from "@/services/gemini"
+
+// Demo mode: Use a constant user ID instead of session auth
+const DEMO_USER_ID = "demo-user"
 
 interface ResumeDocument {
   _id?: ObjectId
@@ -18,18 +20,11 @@ interface ResumeDocument {
   pageCount?: number
 }
 
-// GET /api/resume - Get all resumes for the authenticated user
+// GET /api/resume - Get all resumes for the demo user
 export async function GET() {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-
-    const userId = session.user.id
+    // Demo mode: bypass authentication
+    const userId = DEMO_USER_ID
     const resumesCollection = await getCollection<ResumeDocument>(COLLECTIONS.RESUMES)
 
     const resumes = await resumesCollection
@@ -62,18 +57,11 @@ export async function GET() {
   }
 }
 
-// DELETE /api/resume - Delete all resumes for the authenticated user
+// DELETE /api/resume - Delete all resumes for the demo user
 export async function DELETE() {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-
-    const userId = session.user.id
+    // Demo mode: bypass authentication
+    const userId = DEMO_USER_ID
     const resumesCollection = await getCollection<ResumeDocument>(COLLECTIONS.RESUMES)
 
     const result = await resumesCollection.deleteMany({ userId })
