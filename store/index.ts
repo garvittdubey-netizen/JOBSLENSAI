@@ -1,6 +1,16 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
-import type { User, Job, JobMatch, ResumeData, UserSettings } from "@/lib/types"
+import type {
+  User,
+  Job,
+  ResumeData,
+  UserSettings,
+  Experience,
+  Education,
+  ContactInfo,
+  Project,
+  Certification,
+} from "@/lib/types"
 
 // Auth Store
 interface AuthStore {
@@ -207,29 +217,207 @@ export const useJobStore = create<JobStore>()((set, get) => ({
 // Resume Store
 interface ResumeStore {
   resumeData: ResumeData | null
+  resumes: ResumeData[]
   isAnalyzing: boolean
+  isLoading: boolean
   uploadProgress: number
+  error: string | null
+  uploadResume: (file: File) => Promise<boolean>
+  fetchResumes: () => Promise<void>
+  fetchResumeById: (id: string) => Promise<void>
+  deleteResume: (id: string) => Promise<boolean>
   setResumeData: (data: ResumeData | null) => void
   setAnalyzing: (analyzing: boolean) => void
   setUploadProgress: (progress: number) => void
   clearResume: () => void
+  clearError: () => void
 }
 
 export const useResumeStore = create<ResumeStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       resumeData: null,
+      resumes: [],
       isAnalyzing: false,
+      isLoading: false,
       uploadProgress: 0,
+      error: null,
+
+      uploadResume: async (file: File) => {
+        set({ isAnalyzing: true, uploadProgress: 10, error: null })
+
+        try {
+          const formData = new FormData()
+          formData.append("file", file)
+
+          set({ uploadProgress: 30 })
+
+          const response = await fetch("/api/resume/upload", {
+            method: "POST",
+            body: formData,
+          })
+
+          set({ uploadProgress: 70 })
+
+          const result = await response.json()
+
+          if (!response.ok || !result.success) {
+            throw new Error(result.error || "Failed to upload resume")
+          }
+
+          // Transform API response to ResumeData format
+          const parsedData = result.data.parsedData
+          const resumeData: ResumeData = {
+            id: result.data.id,
+            fileName: result.data.fileName,
+            uploadedAt: new Date(result.data.uploadedAt),
+            skills: parsedData.skills || [],
+            technologies: parsedData.technologies || [],
+            experience: parsedData.experience || [],
+            education: parsedData.education || [],
+            contact: parsedData.contact || { name: "", email: "" },
+            summary: parsedData.summary,
+            projects: parsedData.projects || [],
+            certifications: parsedData.certifications || [],
+            languages: parsedData.languages,
+            atsScore: parsedData.atsScore || 0,
+            atsIssues: parsedData.atsIssues || [],
+            suggestions: parsedData.suggestions || [],
+          }
+
+          set({
+            resumeData,
+            resumes: [resumeData, ...get().resumes.filter((r) => r.id !== resumeData.id)],
+            isAnalyzing: false,
+            uploadProgress: 100,
+          })
+
+          return true
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Upload failed"
+          set({ error: message, isAnalyzing: false, uploadProgress: 0 })
+          return false
+        }
+      },
+
+      fetchResumes: async () => {
+        set({ isLoading: true, error: null })
+
+        try {
+          const response = await fetch("/api/resume")
+          const result = await response.json()
+
+          if (!response.ok || !result.success) {
+            throw new Error(result.error || "Failed to fetch resumes")
+          }
+
+          // Transform API response to ResumeData format
+          const resumes: ResumeData[] = (result.data || []).map((item: Record<string, unknown>) => {
+            const parsedData = item.parsedData as Record<string, unknown> || {}
+            return {
+              id: item.id as string,
+              fileName: item.fileName as string,
+              uploadedAt: new Date(item.uploadedAt as string),
+              skills: (parsedData.skills as string[]) || [],
+              technologies: (parsedData.technologies as string[]) || [],
+              experience: (parsedData.experience as Experience[]) || [],
+              education: (parsedData.education as Education[]) || [],
+              contact: (parsedData.contact as ContactInfo) || { name: "", email: "" },
+              summary: parsedData.summary as string | undefined,
+              projects: (parsedData.projects as Project[]) || [],
+              certifications: (parsedData.certifications as Certification[]) || [],
+              languages: parsedData.languages as string[] | undefined,
+              atsScore: (parsedData.atsScore as number) || 0,
+              atsIssues: (parsedData.atsIssues as string[]) || [],
+              suggestions: (parsedData.suggestions as string[]) || [],
+              wordCount: item.wordCount as number | undefined,
+              pageCount: item.pageCount as number | undefined,
+            }
+          })
+
+          set({
+            resumes,
+            resumeData: resumes[0] || null,
+            isLoading: false,
+          })
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Failed to fetch resumes"
+          set({ error: message, isLoading: false })
+        }
+      },
+
+      fetchResumeById: async (id: string) => {
+        set({ isLoading: true, error: null })
+
+        try {
+          const response = await fetch(`/api/resume/${id}`)
+          const result = await response.json()
+
+          if (!response.ok || !result.success) {
+            throw new Error(result.error || "Failed to fetch resume")
+          }
+
+          const item = result.data
+          const parsedData = item.parsedData || {}
+          const resumeData: ResumeData = {
+            id: item.id,
+            fileName: item.fileName,
+            uploadedAt: new Date(item.uploadedAt),
+            skills: parsedData.skills || [],
+            technologies: parsedData.technologies || [],
+            experience: parsedData.experience || [],
+            education: parsedData.education || [],
+            contact: parsedData.contact || { name: "", email: "" },
+            summary: parsedData.summary,
+            rawText: item.rawText,
+            projects: parsedData.projects || [],
+            certifications: parsedData.certifications || [],
+            languages: parsedData.languages,
+            atsScore: parsedData.atsScore || 0,
+            atsIssues: parsedData.atsIssues || [],
+            suggestions: parsedData.suggestions || [],
+            wordCount: item.wordCount,
+            pageCount: item.pageCount,
+          }
+
+          set({ resumeData, isLoading: false })
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Failed to fetch resume"
+          set({ error: message, isLoading: false })
+        }
+      },
+
+      deleteResume: async (id: string) => {
+        try {
+          const response = await fetch(`/api/resume/${id}`, { method: "DELETE" })
+          const result = await response.json()
+
+          if (!response.ok || !result.success) {
+            throw new Error(result.error || "Failed to delete resume")
+          }
+
+          set((state) => ({
+            resumes: state.resumes.filter((r) => r.id !== id),
+            resumeData: state.resumeData?.id === id ? null : state.resumeData,
+          }))
+
+          return true
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Failed to delete resume"
+          set({ error: message })
+          return false
+        }
+      },
 
       setResumeData: (data) => set({ resumeData: data }),
       setAnalyzing: (analyzing) => set({ isAnalyzing: analyzing }),
       setUploadProgress: (progress) => set({ uploadProgress: progress }),
-      clearResume: () => set({ resumeData: null, uploadProgress: 0 }),
+      clearResume: () => set({ resumeData: null, uploadProgress: 0, error: null }),
+      clearError: () => set({ error: null }),
     }),
     {
       name: "resume-storage",
-      partialize: (state) => ({ resumeData: state.resumeData }),
+      partialize: (state) => ({ resumeData: state.resumeData, resumes: state.resumes }),
     }
   )
 )

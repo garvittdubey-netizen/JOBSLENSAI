@@ -31,6 +31,26 @@ export interface Education {
   institution: string
   graduationDate: string
   gpa?: string
+  fieldOfStudy?: string
+  achievements?: string[]
+}
+
+export interface Project {
+  name: string
+  description: string
+  technologies: string[]
+  url?: string
+  startDate?: string
+  endDate?: string
+}
+
+export interface Certification {
+  name: string
+  issuer: string
+  date?: string
+  expiryDate?: string
+  credentialId?: string
+  url?: string
 }
 
 export interface ContactInfo {
@@ -49,12 +69,21 @@ export interface ResumeData {
   fileName: string
   uploadedAt: Date
   skills: string[]
+  technologies: string[]
   experience: Experience[]
   education: Education[]
   contact: ContactInfo
   summary?: string
   rawText?: string
   matchScore?: number
+  projects: Project[]
+  certifications: Certification[]
+  languages?: string[]
+  atsScore: number
+  atsIssues: string[]
+  suggestions: string[]
+  wordCount?: number
+  pageCount?: number
 }
 
 // Job Types (JSearch API compatible)

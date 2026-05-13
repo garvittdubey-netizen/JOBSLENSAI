@@ -17,32 +17,36 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { useResumeStore } from "@/store"
 import { toast } from "sonner"
-import type { ResumeData } from "@/lib/types"
 
 const ACCEPTED_FILE_TYPES = [
   "application/pdf",
-  "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
 ]
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".txt"]
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
 export function ResumeUploader() {
   const router = useRouter()
-  const { setResumeData, setUploadProgress, uploadProgress } = useResumeStore()
+  const { uploadResume, uploadProgress, isAnalyzing, error: storeError, clearError } = useResumeStore()
   const [isDragging, setIsDragging] = useState(false)
   const [file, setFile] = useState<File | null>(null)
-  const [isUploading, setIsUploading] = useState(false)
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [analysisComplete, setAnalysisComplete] = useState(false)
+  const [localError, setLocalError] = useState<string | null>(null)
+  const [isComplete, setIsComplete] = useState(false)
+
+  const error = localError || storeError
 
   const validateFile = (file: File): string | null => {
-    if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
-      return "Please upload a PDF or Word document"
+    const extension = file.name.toLowerCase().slice(file.name.lastIndexOf("."))
+    const isValidType = ACCEPTED_FILE_TYPES.includes(file.type) || ACCEPTED_EXTENSIONS.includes(extension)
+    
+    if (!isValidType) {
+      return "Please upload a PDF, DOCX, or TXT document"
     }
     if (file.size > MAX_FILE_SIZE) {
-      return "File size must be less than 5MB"
+      return "File size must be less than 10MB"
     }
     return null
   }
@@ -61,26 +65,28 @@ export function ResumeUploader() {
     e.preventDefault()
     e.stopPropagation()
     setIsDragging(false)
-    setError(null)
+    setLocalError(null)
+    clearError()
 
     const droppedFile = e.dataTransfer.files[0]
     if (droppedFile) {
       const validationError = validateFile(droppedFile)
       if (validationError) {
-        setError(validationError)
+        setLocalError(validationError)
         return
       }
       setFile(droppedFile)
     }
-  }, [])
+  }, [clearError])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setError(null)
+    setLocalError(null)
+    clearError()
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
       const validationError = validateFile(selectedFile)
       if (validationError) {
-        setError(validationError)
+        setLocalError(validationError)
         return
       }
       setFile(selectedFile)
@@ -90,97 +96,37 @@ export function ResumeUploader() {
   const handleUpload = async () => {
     if (!file) return
 
-    setIsUploading(true)
-    setError(null)
-    setUploadProgress(0)
+    setLocalError(null)
+    clearError()
 
-    try {
-      // Simulate upload progress (replace with actual upload)
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => Math.min(prev + 10, 90))
-      }, 200)
+    const success = await uploadResume(file)
 
-      // Mock upload and analysis (replace with actual API call)
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-      clearInterval(progressInterval)
-      setUploadProgress(100)
-
-      setIsUploading(false)
-      setIsAnalyzing(true)
-
-      // Mock analysis (replace with actual API call)
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // Mock resume data (replace with actual API response)
-      const mockResumeData: ResumeData = {
-        id: `resume-${Date.now()}`,
-        fileName: file.name,
-        uploadedAt: new Date(),
-        skills: [
-          "JavaScript",
-          "TypeScript",
-          "React",
-          "Next.js",
-          "Node.js",
-          "Python",
-          "SQL",
-          "AWS",
-        ],
-        experience: [
-          {
-            title: "Software Engineer",
-            company: "Tech Company",
-            location: "San Francisco, CA",
-            startDate: "2021",
-            endDate: "Present",
-            description: ["Developed web applications using React and Node.js"],
-            skills: ["React", "Node.js", "AWS"],
-          },
-        ],
-        education: [
-          {
-            degree: "B.S. Computer Science",
-            institution: "University",
-            graduationDate: "2021",
-          },
-        ],
-        contact: {
-          name: "User",
-          email: "user@example.com",
-          location: "San Francisco, CA",
-        },
-        summary: "Experienced software engineer with expertise in web development",
-        matchScore: 85,
-      }
-
-      setResumeData(mockResumeData)
-      setAnalysisComplete(true)
-
+    if (success) {
+      setIsComplete(true)
       toast.success("Resume analyzed successfully!", {
-        description: "We found 8 skills and matched your profile.",
+        description: "Your resume has been parsed and analyzed by AI.",
       })
 
       // Redirect to dashboard after short delay
       setTimeout(() => {
-        router.push("/dashboard")
+        router.push("/dashboard/resume")
       }, 1500)
-    } catch (err) {
-      setError("Failed to upload resume. Please try again.")
+    } else {
       toast.error("Upload failed", {
-        description: "Please try again or use a different file.",
+        description: storeError || "Please try again or use a different file.",
       })
-    } finally {
-      setIsUploading(false)
-      setIsAnalyzing(false)
     }
   }
 
   const resetUpload = () => {
     setFile(null)
-    setError(null)
-    setUploadProgress(0)
-    setAnalysisComplete(false)
+    setLocalError(null)
+    clearError()
+    setIsComplete(false)
   }
+
+  const isUploading = isAnalyzing && uploadProgress < 100 && uploadProgress > 0 && uploadProgress < 70
+  const isAnalyzingAI = isAnalyzing && uploadProgress >= 70 && uploadProgress < 100
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -207,7 +153,7 @@ export function ResumeUploader() {
                 <input
                   type="file"
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  accept=".pdf,.doc,.docx"
+                  accept=".pdf,.docx,.txt"
                   onChange={handleFileSelect}
                 />
 
@@ -223,7 +169,7 @@ export function ResumeUploader() {
                     or click to browse files
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Supports PDF, DOC, DOCX (max 5MB)
+                    Supports PDF, DOCX, TXT (max 10MB)
                   </p>
 
                   {error && (
@@ -251,8 +197,8 @@ export function ResumeUploader() {
                   {/* File Info */}
                   <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-secondary mb-6">
                     <FileText className="w-5 h-5 text-accent" />
-                    <span className="font-medium">{file.name}</span>
-                    {!isUploading && !isAnalyzing && !analysisComplete && (
+                    <span className="font-medium truncate max-w-[200px]">{file.name}</span>
+                    {!isAnalyzing && !isComplete && (
                       <button
                         onClick={resetUpload}
                         className="text-muted-foreground hover:text-foreground"
@@ -282,7 +228,7 @@ export function ResumeUploader() {
                       </motion.div>
                     )}
 
-                    {isAnalyzing && (
+                    {isAnalyzingAI && (
                       <motion.div
                         key="analyzing"
                         initial={{ opacity: 0 }}
@@ -295,31 +241,53 @@ export function ResumeUploader() {
                         </div>
                         <Loader2 className="w-8 h-8 animate-spin mx-auto text-accent" />
                         <p className="text-sm text-muted-foreground mt-4">
-                          Extracting skills, experience, and qualifications
+                          Extracting skills, experience, and qualifications with Gemini AI
                         </p>
                       </motion.div>
                     )}
 
-                    {analysisComplete && (
+                    {isComplete && (
                       <motion.div
                         key="complete"
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0 }}
                       >
-                        <div className="w-16 h-16 rounded-full bg-green-100 mx-auto mb-4 flex items-center justify-center">
-                          <CheckCircle className="w-8 h-8 text-green-600" />
+                        <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 mx-auto mb-4 flex items-center justify-center">
+                          <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
                         </div>
                         <h3 className="text-xl font-semibold mb-2">
                           Analysis Complete!
                         </h3>
                         <p className="text-muted-foreground">
-                          Redirecting to your dashboard...
+                          Redirecting to your resume dashboard...
                         </p>
                       </motion.div>
                     )}
 
-                    {!isUploading && !isAnalyzing && !analysisComplete && (
+                    {error && !isAnalyzing && (
+                      <motion.div
+                        key="error"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="space-y-4"
+                      >
+                        <div className="w-16 h-16 rounded-full bg-destructive/10 mx-auto mb-4 flex items-center justify-center">
+                          <XCircle className="w-8 h-8 text-destructive" />
+                        </div>
+                        <p className="text-destructive text-sm">{error}</p>
+                        <Button
+                          onClick={resetUpload}
+                          variant="outline"
+                          className="rounded-xl"
+                        >
+                          Try Again
+                        </Button>
+                      </motion.div>
+                    )}
+
+                    {!isAnalyzing && !isComplete && !error && (
                       <motion.div
                         key="ready"
                         initial={{ opacity: 0 }}
@@ -332,10 +300,10 @@ export function ResumeUploader() {
                           className="rounded-xl px-8"
                         >
                           <Sparkles className="w-5 h-5 mr-2" />
-                          Analyze Resume
+                          Analyze Resume with AI
                         </Button>
                         <p className="text-sm text-muted-foreground mt-4">
-                          Your data is encrypted and secure
+                          Powered by Gemini 2.0 Flash - Your data is encrypted and secure
                         </p>
                       </motion.div>
                     )}
